@@ -455,7 +455,7 @@ def run_bot():
     )
 
     application.add_handler(conv_handler)
-    application.run_polling()
+    application.run_polling(stop_signals=None)
 
 # ------------------------------------------------------------
 # СОЗДАЕМ ВЕБ-СЕРВЕР ДЛЯ HEALTH CHECK (Flask)
