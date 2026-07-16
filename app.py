@@ -439,7 +439,7 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 # ------------------------------------------------------------
-# ФУНКЦИЯ ЗАПУСКА БОТА (в отдельном потоке)
+# ФУНКЦИЯ ЗАПУСКА БОТА (в главном потоке)
 # ------------------------------------------------------------
 def run_bot():
     application = ApplicationBuilder().token(BOT_TOKEN).build()
@@ -455,43 +455,26 @@ def run_bot():
     )
 
     application.add_handler(conv_handler)
+    # Главное изменение: отключаем обработку сигналов
     application.run_polling(stop_signals=None)
 
 # ------------------------------------------------------------
-# СОЗДАЕМ ВЕБ-СЕРВЕР ДЛЯ HEALTH CHECK (Flask)
+# ФУНКЦИЯ ЗАПУСКА FLASK (в фоновом потоке)
 # ------------------------------------------------------------
-app = Flask(__name__)
-
-HTML_PAGE = """
-<!doctype html>
-<html>
-<head><title>Астафьев Бот</title></head>
-<body>
-    <h1>Бот-викторина по творчеству Астафьева работает!</h1>
-    <p>Версия: 1.0</p>
-    <p><a href="/health">Health Check</a></p>
-</body>
-</html>
-"""
-
-@app.route('/')
-def index():
-    return render_template_string(HTML_PAGE)
-
-@app.route('/health')
-def health_check():
-    return "OK", 200
+def run_flask():
+    """Запускает Flask-сервер для health check в отдельном потоке."""
+    port = int(os.environ.get("PORT", 8080))
+    logging.info(f"Запуск веб-сервера на порту {port}...")
+    app.run(host='0.0.0.0', port=port)
 
 # ------------------------------------------------------------
 # ТОЧКА ВХОДА
 # ------------------------------------------------------------
 if __name__ == '__main__':
-    # Запускаем бота в отдельном потоке
-    bot_thread = threading.Thread(target=run_bot, daemon=True)
-    bot_thread.start()
-    logging.info("Бот запущен в фоновом потоке.")
+    # Запускаем Flask в отдельном потоке, чтобы не блокировать основную логику
+    flask_thread = threading.Thread(target=run_flask, daemon=True)
+    flask_thread.start()
+    logging.info("Flask запущен в фоновом потоке.")
 
-    # Запускаем веб-сервер Flask
-    port = int(os.environ.get("PORT", 8080))
-    logging.info(f"Запуск веб-сервера на порту {port}...")
-    app.run(host='0.0.0.0', port=port)
+    # Запускаем бота в главном потоке (так asyncio работает корректно)
+    run_bot()
